@@ -88,6 +88,7 @@ public class ThreadLocal<T> {
      * The next hash code to be given out. Updated atomically. Starts at
      * zero.
      */
+    // AtomicInteger是一个提供原子操作的Integer类，高并发下保证线程安全
     private static AtomicInteger nextHashCode =
         new AtomicInteger();
 
@@ -96,6 +97,9 @@ public class ThreadLocal<T> {
      * implicit sequential thread-local IDs into near-optimally spread
      * multiplicative hash values for power-of-two-sized tables.
      */
+    // 一个特殊的hash值 这个值和斐波那契数列（黄金分割数）有关
+    // 目的是为了让哈希吗均匀的分布在2的n次方的数组中，也就是我们的Entry[]数组中
+    // 尽量避免哈希冲突
     private static final int HASH_INCREMENT = 0x61c88647;
 
     /**
@@ -123,6 +127,8 @@ public class ThreadLocal<T> {
      *
      * @return the initial value for this thread-local
      */
+    //这里使用了protected来修饰
+    // protected是同包以及子类可以重写，所以是为了我们继承ThreadLocal重写这个方法来设计的
     protected T initialValue() {
         return null;
     }
@@ -157,11 +163,16 @@ public class ThreadLocal<T> {
      * @return the current thread's value of this thread-local
      */
     public T get() {
+        //获取当前线程
         Thread t = Thread.currentThread();
+        //获取当前线程的ThreadLocalMap
         ThreadLocalMap map = getMap(t);
         if (map != null) {
+            //以当前threadLocal为键获键值对
             ThreadLocalMap.Entry e = map.getEntry(this);
             if (e != null) {
+                //存在返回值
+                //@SuppressWarnings("unchecked")注解的作用：告诉编译器忽略 unchecked 警告信息
                 @SuppressWarnings("unchecked")
                 T result = (T)e.value;
                 return result;
@@ -176,6 +187,7 @@ public class ThreadLocal<T> {
      *
      * @return the initial value
      */
+    //给当前ThreadLocal的值设为null并且返回
     private T setInitialValue() {
         T value = initialValue();
         Thread t = Thread.currentThread();
@@ -197,11 +209,15 @@ public class ThreadLocal<T> {
      *        this thread-local.
      */
     public void set(T value) {
+        //获取当前线程
         Thread t = Thread.currentThread();
+        //获取当前线程的thradLocalMap
         ThreadLocalMap map = getMap(t);
         if (map != null)
+            //存在直接把当前threadLocal及值存储在ThreadLocalMap中
             map.set(this, value);
         else
+            //不存在创建一个新的ThreadLocalMap
             createMap(t, value);
     }
 
@@ -216,7 +232,8 @@ public class ThreadLocal<T> {
      *
      * @since 1.5
      */
-     public void remove() {
+    //删除当前ThreadLocal对应的键值对
+    public void remove() {
          ThreadLocalMap m = getMap(Thread.currentThread());
          if (m != null)
              m.remove(this);
@@ -305,10 +322,12 @@ public class ThreadLocal<T> {
          * entry can be expunged from table.  Such entries are referred to
          * as "stale entries" in the code that follows.
          */
+        // Entry继承了WeakReference，说明是弱引用
+        // 目的是将ThreadLocal的生命周期和线程的生命周期进行解绑
         static class Entry extends WeakReference<ThreadLocal<?>> {
             /** The value associated with this ThreadLocal. */
             Object value;
-
+            //键的类型已经限制死了，只能是ThradLocal<?>
             Entry(ThreadLocal<?> k, Object v) {
                 super(k);
                 value = v;
@@ -318,22 +337,27 @@ public class ThreadLocal<T> {
         /**
          * The initial capacity -- MUST be a power of two.
          */
+        //初始容量
+        // 必须是2的整次幂 主要是为了后面的哈希运算 避免哈希冲突的问题
         private static final int INITIAL_CAPACITY = 16;
 
         /**
          * The table, resized as necessary.
          * table.length MUST always be a power of two.
          */
+        //用于存储数据的键值对数组  key:ThreadLocal<?>  value:Object
         private Entry[] table;
 
         /**
          * The number of entries in the table.
          */
+        //键值对的数量，用于判断当前table的使用量是否超过阈值
         private int size = 0;
 
         /**
          * The next size value at which to resize.
          */
+        //阈值 初始值为0  size大于这个值的时候进行扩容
         private int threshold; // Default to 0
 
         /**
@@ -363,10 +387,15 @@ public class ThreadLocal<T> {
          * one when we have at least one entry to put in it.
          */
         ThreadLocalMap(ThreadLocal<?> firstKey, Object firstValue) {
+            //初始化table  长度为16
             table = new Entry[INITIAL_CAPACITY];
+            //计算索引 （划重点）
             int i = firstKey.threadLocalHashCode & (INITIAL_CAPACITY - 1);
+            //存储键值对的值
             table[i] = new Entry(firstKey, firstValue);
+            //设置长度为 1
             size = 1;
+            //设置阈值为初始值 0
             setThreshold(INITIAL_CAPACITY);
         }
 
@@ -460,19 +489,28 @@ public class ThreadLocal<T> {
 
             Entry[] tab = table;
             int len = tab.length;
+            //计算索引
             int i = key.threadLocalHashCode & (len-1);
 
+            //使用线性探测法查找元素 （划重点）
+            //线性探测法举例
+            //假设我们的table的长度为16，然后我们根据key算出来的hash值为14，但是14上面的key和我们现在的key值不相等，
+            // 那么就把hash值+1变成15，如果15上面的key还是不相等，那么就把hash值加一变为0，以此类推
             for (Entry e = tab[i];
                  e != null;
                  e = tab[i = nextIndex(i, len)]) {
                 ThreadLocal<?> k = e.get();
 
+                //key相同直接覆盖值
                 if (k == key) {
                     e.value = value;
                     return;
                 }
 
+                //key为null 说明ThreadLocal已经被回收了
                 if (k == null) {
+                    //这里用新元素代替了旧元素
+                    // 做了很多清理的垃圾回收动作，避免内存泄漏的问题
                     replaceStaleEntry(key, value, i);
                     return;
                 }
@@ -480,6 +518,7 @@ public class ThreadLocal<T> {
 
             tab[i] = new Entry(key, value);
             int sz = ++size;
+            //获取环形数组的下一个元素
             if (!cleanSomeSlots(i, sz) && sz >= threshold)
                 rehash();
         }

@@ -15,8 +15,6 @@ public class TestObjectToList {
         Iterator<Integer> iterator = integerList.iterator();
         List<Integer> integers = Arrays.asList(i);
         List<Integer> integers1 = Arrays.asList(ins);
-
-
         System.out.println("integers = " + integers);
         System.out.println("integerList = " + integerList);
     }
