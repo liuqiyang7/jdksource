@@ -12,7 +12,6 @@ public class TestObjectToList {
         int i = 1;
         List<Integer> integerList = Collections.singletonList(i);
         Integer[] ins = new Integer[]{1,3,5};
-        Iterator<Integer> iterator = integerList.iterator();
         List<Integer> integers = Arrays.asList(i);
         List<Integer> integers1 = Arrays.asList(ins);
         System.out.println("integers = " + integers);
